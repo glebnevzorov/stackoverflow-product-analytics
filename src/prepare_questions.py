@@ -5,21 +5,34 @@ from pathlib import Path
 import pandas as pd
 
 
-INPUT_PATH = Path(
-    "data/raw/questions_2026-01-01_page_1.json"
+INPUT_DIRECTORY = Path(
+    "data/raw/questions"
 )
 
 OUTPUT_DIRECTORY = Path("data/processed")
 
 
-with INPUT_PATH.open(
-    mode="r",
-    encoding="utf-8",
-) as file:
-    data = json.load(file)
+input_paths = sorted(
+    INPUT_DIRECTORY.glob("questions_*.json")
+)
 
+if not input_paths:
+    raise FileNotFoundError(
+        f"В папке {INPUT_DIRECTORY} не найдены JSON-файлы"
+    )
 
-questions = data["items"]
+questions = []
+
+for input_path in input_paths:
+    with input_path.open(
+        mode="r",
+        encoding="utf-8",
+    ) as file:
+        data = json.load(file)
+
+    questions.extend(
+        data.get("items", [])
+    )
 
 questions_df = pd.json_normalize(
     questions,
