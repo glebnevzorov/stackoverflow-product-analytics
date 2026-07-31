@@ -15,8 +15,11 @@ OUTPUT_DIRECTORY = Path(
     "data/raw/user_questions"
 )
 
+API_VERSION = "2.4"
+
 API_BASE_URL = (
-    "https://api.stackexchange.com/2.3/users"
+    f"https://api.stackexchange.com/"
+    f"{API_VERSION}/users"
 )
 
 BATCH_SIZE = 100
@@ -84,7 +87,8 @@ OUTPUT_DIRECTORY.mkdir(
 
 
 # Удаляем файлы предыдущего запуска,
-# чтобы старые страницы не смешались с новыми
+# чтобы данные API 2.3 не смешались
+# с новыми данными API 2.4
 old_output_paths = list(
     OUTPUT_DIRECTORY.glob(
         "user_questions_batch_*.json"
@@ -95,12 +99,28 @@ for old_output_path in old_output_paths:
     old_output_path.unlink()
 
 
+print(
+    "Удалено старых файлов: "
+    f"{len(old_output_paths)}"
+)
+
+print(
+    "Используемая версия API: "
+    f"{API_VERSION}"
+)
+
+
 total_batches = (
     len(author_ids) + BATCH_SIZE - 1
 ) // BATCH_SIZE
 
 total_user_questions = 0
 request_count = 0
+quota_remaining = None
+
+missing_post_state_count = 0
+
+post_state_counts = {}
 
 
 # Делим авторов на пачки максимум по 100 user_id
@@ -157,6 +177,31 @@ for batch_number, start_index in enumerate(
             "items",
             [],
         )
+
+        quota_remaining = data.get(
+            "quota_remaining"
+        )
+
+
+        # Считаем состояния вопросов:
+        # Published, StagingGround_... и другие
+        for user_question in user_questions:
+            post_state = user_question.get(
+                "post_state"
+            )
+
+            if post_state is None:
+                missing_post_state_count += 1
+                continue
+
+            post_state_counts[post_state] = (
+                post_state_counts.get(
+                    post_state,
+                    0,
+                )
+                + 1
+            )
+
 
         output_path = (
             OUTPUT_DIRECTORY
@@ -218,6 +263,11 @@ for batch_number, start_index in enumerate(
 print("\nЗагрузка завершена")
 
 print(
+    "Версия API: "
+    f"{API_VERSION}"
+)
+
+print(
     "Вопросов когорты без author_id: "
     f"{questions_without_author}"
 )
@@ -243,6 +293,28 @@ print(
 )
 
 print(
-    "Осталось запросов: "
-    f"{data.get('quota_remaining')}"
+    "Вопросов без post_state: "
+    f"{missing_post_state_count}"
 )
+
+print("\nКоличество вопросов по post_state:")
+
+for post_state, question_count in sorted(
+    post_state_counts.items()
+):
+    print(
+        f"{post_state}: "
+        f"{question_count}"
+    )
+
+print(
+    "\nОсталось запросов: "
+    f"{quota_remaining}"
+)
+
+
+if missing_post_state_count > 0:
+    raise ValueError(
+        "В ответах API 2.4 найдены вопросы "
+        "без поля post_state"
+    )
