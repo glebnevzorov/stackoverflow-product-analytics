@@ -4,8 +4,8 @@ from pathlib import Path
 import pandas as pd
 
 
-ANSWERS_INPUT_PATH = Path(
-    "data/raw/answers_2026-01-01_page_1.json"
+ANSWERS_INPUT_DIRECTORY = Path(
+    "data/raw/answers"
 )
 
 QUESTIONS_INPUT_PATH = Path(
@@ -15,14 +15,31 @@ QUESTIONS_INPUT_PATH = Path(
 OUTPUT_DIRECTORY = Path("data/processed")
 
 
-# Читаем сырой JSON с ответами
-with ANSWERS_INPUT_PATH.open(
-    mode="r",
-    encoding="utf-8",
-) as file:
-    data = json.load(file)
+answer_input_paths = sorted(
+    ANSWERS_INPUT_DIRECTORY.glob(
+        "answers_batch_*.json"
+    )
+)
 
-answers = data["items"]
+if not answer_input_paths:
+    raise FileNotFoundError(
+        "В папке "
+        f"{ANSWERS_INPUT_DIRECTORY} "
+        "не найдены JSON-файлы ответов"
+    )
+
+answers = []
+
+for answer_input_path in answer_input_paths:
+    with answer_input_path.open(
+        mode="r",
+        encoding="utf-8",
+    ) as file:
+        data = json.load(file)
+
+    answers.extend(
+        data.get("items", [])
+    )
 
 # Превращаем вложенный JSON в DataFrame
 answers_df = pd.json_normalize(
@@ -372,4 +389,24 @@ print(
     ]
     .head(10)
     .to_string(index=False)
+)
+
+print(
+    "Ответов с неопределённым типом автора: "
+    f"{answers_df['is_self_answer'].isna().sum()}"
+)
+
+print(
+    "Ответов на вопросы без известного автора: "
+    f"{answers_df['question_author_id'].isna().sum()}"
+)
+
+print(
+    "Ответов без найденного вопроса: "
+    f"{answers_df['question_created_at'].isna().sum()}"
+)
+
+print(
+    "Строк в таблице метрик: "
+    f"{len(question_answer_metrics_df)}"
 )
