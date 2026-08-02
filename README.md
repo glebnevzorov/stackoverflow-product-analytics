@@ -74,7 +74,7 @@ Stack Exchange API
         ↓
 JSON-файлы
         ↓
-обработка в Python
+обработка в Python c использованием Pandas
         ↓
 Parquet
         ↓
